@@ -1,0 +1,58 @@
+name: Fetch HN front page
+
+on:
+  schedule:
+    - cron: "45 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch front page + top article text
+        run: |
+          set -e
+          DATE=$(date -u +%Y-%m-%d)
+          DIR="data/raw/$DATE"
+          mkdir -p "$DIR"
+          curl -sS "https://hn.algolia.com/api/v1/search?tags=front_page" -o "$DIR/front_page.json"
+          python3 - "$DIR" <<'PY'
+          import json, re, subprocess, sys
+
+          out_dir = sys.argv[1]
+          data = json.load(open(f"{out_dir}/front_page.json"))
+          hits = sorted(data.get("hits", []), key=lambda h: h.get("points") or 0, reverse=True)[:8]
+
+          for h in hits:
+              url = h.get("url")
+              oid = h.get("objectID")
+              if not url or not oid:
+                  continue
+              try:
+                  proc = subprocess.run(
+                      ["curl", "-sSL", "--max-time", "15", url],
+                      capture_output=True, timeout=20,
+                  )
+                  text = proc.stdout.decode("utf-8", errors="ignore")
+                  text = re.sub(r"(?is)<script.*?</script>", " ", text)
+                  text = re.sub(r"(?is)<style.*?</style>", " ", text)
+                  text = re.sub(r"(?s)<[^>]+>", " ", text)
+                  text = re.sub(r"\s+", " ", text).strip()
+                  with open(f"{out_dir}/article_{oid}.txt", "w") as f:
+                      f.write(text[:20000])
+              except Exception:
+                  continue
+          PY
+
+      - name: Commit and push
+        run: |
+          git config user.name "pbhusari"
+          git config user.email "pranavbhusari2013@gmail.com"
+          git add data/raw
+          git diff --cached --quiet || git commit -m "Fetch HN raw data: $(date -u +%Y-%m-%d)"
+          git push
