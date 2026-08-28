@@ -8,6 +8,12 @@ Each day it pulls the current HN front page via the public Algolia API and drops
 
 - `digests/YYYY-MM-DD.md` — one file per day.
 
+## Latest Deep Dive
+
+<!-- STUDY:START -->
+Nothing yet. First run happens at midnight PT.
+<!-- STUDY:END -->
+
 ## Why this exists
 
 Mostly to keep a daily habit of skimming HN without doing it manually, and to have a searchable log of what caught attention on a given day.
